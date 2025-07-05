@@ -4,16 +4,19 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import logging
 import uvicorn
+
+from environment import ENABLE_WEB_SEARCH, MAX_SEARCH_RESULTS
+from environment import GROQ_MODEL, GROQ_API_KEY
+
 from vector_store import VectorStore
 from llm_service import LLMService
 from OLD_agent import NetworkIntegrationAgent
 from update_checker import UpdateChecker
 from web_search import WebSearcher
-from environment import ENABLE_WEB_SEARCH, MAX_SEARCH_RESULTS
-from environment import GROQ_MODEL, GROQ_API_KEY
+from topology_analyzer_Latest import TopologyAnalyzer
 
 from mcp_api import router as mcp_router
-from topology_api import router as topology_router
+# from topology_api import router as topology_router
 from admin_api import router as admin_router
 
 logging.basicConfig(level=logging.INFO)
@@ -21,12 +24,9 @@ logger = logging.getLogger(__name__)
 
 vector_store = VectorStore()
 llm_service = LLMService(model_name=GROQ_MODEL)
-
-web_searcher = None
-if ENABLE_WEB_SEARCH:
-    web_searcher = WebSearcher(max_results=MAX_SEARCH_RESULTS)
-
+web_searcher = WebSearcher(max_results=MAX_SEARCH_RESULTS) if ENABLE_WEB_SEARCH else None
 agent = NetworkIntegrationAgent(vector_store, llm_service, web_searcher)
+topology_analyzer = TopologyAnalyzer(vector_store, web_searcher)
 
 app = FastAPI(
     title="Network Integration Assistant API",
@@ -43,7 +43,7 @@ app.add_middleware(
 
 
 # app.include_router(mcp_router)  # <- Attach the MCP API routes here
-app.include_router(topology_router, prefix="/topology")
+# app.include_router(topology_router, prefix="/topology")
 app.include_router(admin_router, prefix="/admin")
 
 class QueryRequest(BaseModel):

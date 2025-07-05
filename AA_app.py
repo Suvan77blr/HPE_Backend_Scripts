@@ -8,6 +8,8 @@ from vector_store import VectorStore
 from llm_service import LLMService
 from AA_agent import NetworkIntegrationAgent
 from web_search import WebSearcher
+from topology_analyzer_Latest import TopologyAnalyzer
+
 from environment import ENABLE_WEB_SEARCH, MAX_SEARCH_RESULTS, GROQ_MODEL, GROQ_API_KEY
 
 # Import Groq orchestrator
@@ -26,12 +28,15 @@ vector_store = VectorStore()
 llm_service = LLMService(model_name=GROQ_MODEL)
 web_searcher = WebSearcher(max_results=MAX_SEARCH_RESULTS) if ENABLE_WEB_SEARCH else None
 agent = NetworkIntegrationAgent(vector_store, llm_service, web_searcher)
+topology_analyzer = TopologyAnalyzer(vector_store, web_searcher)
 
 # Initialize Groq orchestrator
 groq_orchestrator = GroqOrchestrator(
     vector_store=vector_store,
     llm_service=llm_service,
-    web_searcher=web_searcher
+    web_searcher=web_searcher,
+    topology_analyzer=topology_analyzer,
+    agent=agent
 )
 
 app = FastAPI(
@@ -48,10 +53,7 @@ app.add_middleware(
 )
 
 # Include routers with dependency injection
-app.include_router(
-    mcp_router(groq_orchestrator), 
-    prefix="/mcp"
-)
+app.include_router( mcp_router(groq_orchestrator), prefix="/mcp" )
 app.include_router(topology_router, prefix="/topology")
 app.include_router(admin_router, prefix="/admin")
 

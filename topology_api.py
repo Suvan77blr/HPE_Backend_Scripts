@@ -44,6 +44,10 @@ logger = logging.getLogger(__name__)
 vector_store = VectorStore()
 llm_service = LLMService(model_name=GROQ_MODEL)
 web_searcher = WebSearcher(max_results=MAX_SEARCH_RESULTS) if ENABLE_WEB_SEARCH else None
+# web_searcher = None
+# if ENABLE_WEB_SEARCH:
+#     web_searcher = WebSearcher(max_results=MAX_SEARCH_RESULTS)
+
 agent = NetworkIntegrationAgent(vector_store, llm_service, web_searcher)
 topology_analyzer = TopologyAnalyzer(vector_store, web_searcher)
 
