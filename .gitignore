@@ -98,3 +98,5 @@ r1_rag_venv
 
 Files_copy/
 logs/
+
+*.zip
