@@ -1,0 +1,29 @@
+uvicorn
+fastapi
+selenium
+webdriver_manager
+bs4 
+requests
+PyPDF2
+chromadb
+sentence_transformers
+groq
+duckduckgo_search
+schedule
+#
+mcp
+onnxruntime
+streamlit
+diskcache
+
+# Topology
+google-generativeai
+pillow
+python-multipart
+# jinja2
+aiofiles
+httpx
+markdown2
+
+crewai
+autogen

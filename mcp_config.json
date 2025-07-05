@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "r1-rag": {
+      "command": "F:/R1_rag/venv/Scripts/python.exe",
+      "args": ["F:/R1_rag/mcp_server.py"],
+      "cwd": "F:/R1_rag",
+      "env": {
+        "PYTHONPATH": "F:/R1_rag"
+      }
+    }
+  }
+} 
