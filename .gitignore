@@ -1,0 +1,100 @@
+environment.py 
+venv/ 
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# R1-RAG specific
+scraper_cache/
+chroma_db/
+tracking/
+update_checker_cache/
+cache/
+*.log
+*.state
+*.json.gz
+.env
+.env.*
+!environment.py # Assuming you want to keep the one explicitly added if it's a template
+
+# MCP related
+mcp_config_local.json
+*.mcp.log
+
+# ChromaDB database files
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Selenium WebDriver logs and temp files
+webdriver/
+*.tmp
+geckodriver.log
+chromedriver.log
+
+# Model downloads and cache
+models/
+.cache/
+.transformers_cache/
+.sentence_transformers/
+
+# Large data files (keep sample files but ignore large datasets)
+*.jsonl
+*_large.json
+*_dump.json
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Large data files
+extracted_documents.json
+*.json.gz
+extracted_*.json
+
+# Cache and temporary files  
+web_search_cache/
+scraper_cache/
+update_checker_cache/
+__pycache__/
+
+# Database files
+chroma_db/
+chroma_db_backup/
+
+# Virtual environment
+venv/ 
+r1_rag_venv
+
+# Other Unwanted Files
+*.png
+*.docx
+*_Notes*
+*links*.txt
+
+Files_copy/
+logs/
