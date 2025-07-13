@@ -8,18 +8,18 @@ import os                                                           ###
 from environment import ENABLE_WEB_SEARCH, MAX_SEARCH_RESULTS
 from environment import GROQ_MODEL, GROQ_API_KEY
 
-from vector_store import VectorStore                # Your VectorStore class
-from llm_service import LLMService
-from OLD_agent import NetworkIntegrationAgent
-from update_checker import UpdateChecker            # Your UpdateChecker class
-from web_search import WebSearcher
+from server_tools.vector_store import VectorStore                # Your VectorStore class
+from server_tools.llm_service_OLD import LLMService
+from server_tools.agent_OLD import NetworkIntegrationAgent
+from server_tools.update_checker import UpdateChecker            # Your UpdateChecker class
+from server_tools.web_search import WebSearcher
 # From main.py
-from ingestion import DataIngestionPipeline         # Your DataIngestionPipeline class
-from scraper import NetworkDocScraper               # Your NetworkDocScraper class
+from server_tools.ingestion import DataIngestionPipeline         # Your DataIngestionPipeline class
+from server_tools.scraper import NetworkDocScraper               # Your NetworkDocScraper class
 
-from scraper_utils_NEW import warm_scraper_cache_from_link_files
-from mcp_api import router as mcp_router  # <- Import the MCP router
-from topology_api import router as topology_router
+from server_tools.scraper_utils_NEW import warm_scraper_cache_from_link_files
+from server_routes.mcp_api_OLD import router as mcp_router  # <- Import the MCP router
+from server_routes.topology_api import router as topology_router
 
 # Topology related.
 from fastapi import UploadFile, File, Form, Request

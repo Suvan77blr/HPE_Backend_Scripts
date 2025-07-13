@@ -8,16 +8,16 @@ import uvicorn
 from environment import ENABLE_WEB_SEARCH, MAX_SEARCH_RESULTS
 from environment import GROQ_MODEL, GROQ_API_KEY
 
-from vector_store import VectorStore
-from llm_service import LLMService
-from OLD_agent import NetworkIntegrationAgent
-from update_checker import UpdateChecker
-from web_search import WebSearcher
-from topology_analyzer_Latest import TopologyAnalyzer
+from server_tools.vector_store import VectorStore
+from server_tools.llm_service_OLD import LLMService
+from server_tools.agent_OLD import NetworkIntegrationAgent
+from server_tools.update_checker import UpdateChecker
+from server_tools.web_search import WebSearcher
+from server_tools.topology_analyzer import TopologyAnalyzer
 
-from mcp_api import router as mcp_router
+from server_routes.mcp_api_OLD import router as mcp_router
 # from topology_api import router as topology_router
-from admin_api import router as admin_router
+from server_routes.admin_api import router as admin_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

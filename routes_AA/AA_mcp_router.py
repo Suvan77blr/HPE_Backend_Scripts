@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile
-from topology_analyzer import TopologyAnalyzer
+from server_tools.topology_analyzer_OLD import TopologyAnalyzer
 
 router = APIRouter()
 analyzer = TopologyAnalyzer()

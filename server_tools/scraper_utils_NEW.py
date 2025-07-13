@@ -1,5 +1,5 @@
 import os, logging
-from scraper import NetworkDocScraper
+from server_tools.scraper import NetworkDocScraper
 
 logger = logging.getLogger(__name__)
 LOG_TAG = "[CACHE-WARMING]"

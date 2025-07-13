@@ -4,8 +4,8 @@ import logging
 from typing import Dict, List, Any, Optional # Added Optional
 from datetime import datetime as dt 
 import threading
-from scraper import NetworkDocScraper 
-from ingestion import DataIngestionPipeline 
+from server_tools.scraper import NetworkDocScraper 
+from server_tools.ingestion import DataIngestionPipeline 
 from environment import UPDATE_CHECK_INTERVAL 
 import json
 import os

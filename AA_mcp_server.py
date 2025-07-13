@@ -1,8 +1,8 @@
 
 from fastapi import FastAPI, HTTPException
 from groq_orchestrator import GroqOrchestrator
-from vector_store import VectorStore
-from web_search import WebSearcher
+from server_tools.vector_store import VectorStore
+from server_tools.web_search import WebSearcher
 from utils.AA_mcp_handler import MCPHandler
 import os
 

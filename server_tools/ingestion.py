@@ -2,9 +2,9 @@ import logging
 import json
 import os
 import datetime
-from scraper import NetworkDocScraper
-from document_processor import DocumentProcessor
-from vector_store import VectorStore # Make sure this import is correct
+from server_tools.scraper import NetworkDocScraper
+from server_tools.document_processor import DocumentProcessor
+from server_tools.vector_store import VectorStore # Make sure this import is correct
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

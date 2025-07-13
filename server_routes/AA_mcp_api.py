@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import json
-from AA_groq_orchestrator import GroqOrchestrator
+from groq_orchestrator import GroqOrchestrator
 import logging
 
 logger = logging.getLogger(__name__)

@@ -113,7 +113,7 @@ def recreate_database():
     
     # Create new database
     try:
-        from vector_store import VectorStore
+        from server_tools.vector_store import VectorStore
         print("Creating new VectorStore...")
         vs = VectorStore()
         

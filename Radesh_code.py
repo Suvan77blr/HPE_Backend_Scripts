@@ -1,7 +1,7 @@
 import streamlit as st
 import chromadb
 from chromadb.utils import embedding_functions
-from web_search import WebSearcher  # <- You must provide this implementation
+from server_tools.web_search import WebSearcher  # <- You must provide this implementation
 import openai
 import time
 import os

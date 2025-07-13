@@ -1,207 +1,3 @@
-# # Added from topology module.
-
-# import json
-# import logging
-# import re
-# from typing import Dict, Any, Optional
-# from gemini_service import GeminiService
-# from mermaid_generator import MermaidGenerator
-# from vector_store import VectorStore
-# from web_search import WebSearcher
-
-# import markdown2
-
-# logger = logging.getLogger(__name__)
-
-# class TopologyAnalyzer:
-#     def __init__(self, vector_store: VectorStore, web_searcher: Optional[WebSearcher] = None):
-#         """Initialize topology analyzer with enhanced error handling"""
-#         self.gemini_service = GeminiService()
-#         self.mermaid_generator = MermaidGenerator()
-#         self.vector_store = vector_store
-#         self.web_searcher = web_searcher
-
-#     def parse_gemini_response(self, response_text: str) -> Dict[str, Any]:
-#         """Robust JSON parsing with multiple fallback strategies"""
-#         logger.info(f"Parsing Gemini response of {len(response_text)} characters")
-
-#         # Strategy 1: Direct JSON parsing
-#         try:
-#             parsed = json.loads(response_text.strip())
-#             logger.info("Successfully parsed JSON directly")
-#             return parsed
-#         except json.JSONDecodeError as e:
-#             logger.warning(f"Direct JSON parsing failed: {e}")
-
-#         # Strategy 2: Extract JSON from markdown code blocks
-#         json_patterns = [
-#             r'```json\s*(\{.*?\})\s*```',
-#             r'```(.*?)```',
-#             r'(\{.*\})'
-#         ]
-
-#         for pattern in json_patterns:
-#             try:
-#                 match = re.search(pattern, response_text, re.DOTALL)
-#                 if match:
-#                     json_str = match.group(1).strip()
-#                     parsed = json.loads(json_str)
-#                     logger.info("Successfully extracted JSON using pattern")
-#                     return parsed
-#             except (json.JSONDecodeError, AttributeError):
-#                 continue
-
-#         # Strategy 3: Clean and attempt parsing
-#         try:
-#             cleaned = response_text.strip()
-#             cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned, flags=re.MULTILINE)
-#             cleaned = re.sub(r'```$', '', cleaned, flags=re.MULTILINE)
-#             cleaned = re.sub(r'^json\s*', '', cleaned, flags=re.MULTILINE)
-
-#             parsed = json.loads(cleaned)
-#             logger.info("Successfully parsed cleaned JSON")
-#             return parsed
-#         except json.JSONDecodeError:
-#             pass
-
-#         # Strategy 4: Create structured response from text analysis
-#         logger.warning("All JSON parsing strategies failed. Creating fallback structure.")
-#         return self.create_fallback_structure(response_text)
-
-#     def create_fallback_structure(self, text: str) -> Dict[str, Any]:
-#         """Create structured data from unstructured text"""
-#         devices = []
-
-#         device_patterns = [
-#             (r'catalyst\s*(\d+)', 'cisco', 'switch'),
-#             (r'nexus\s*(\d+)', 'cisco', 'switch'),
-#             (r'c(\d{4})', 'cisco', 'switch'),
-#             (r'ex(\d+)', 'juniper', 'switch'),
-#             (r'mx(\d+)', 'juniper', 'router'),
-#             (r'srx(\d+)', 'juniper', 'firewall'),
-#             (r'cx\s*(\d+)', 'aruba', 'switch'),
-#             (r'procurve\s*(\d+)', 'hpe', 'switch'),
-#             (r'dcs[-\s]*(\d+)', 'arista', 'switch'),
-#             (r'(\d+[A-Z]+\d*)', 'generic', 'switch')
-#         ]
-
-#         device_id_counter = 1
-#         found_devices = set()
-
-#         for pattern, vendor, device_type in device_patterns:
-#             matches = re.findall(pattern, text, re.IGNORECASE)
-#             for match in matches:
-#                 device_name = f"{vendor}_{device_type}_{match}"
-#                 if device_name not in found_devices:
-#                     devices.append({
-#                         "id": f"device_{device_id_counter}",
-#                         "type": device_type,
-#                         "vendor": vendor,
-#                         "model": f"{vendor.upper()} {match}",
-#                         "specifications": {"ports": "unknown", "speed": "unknown"},
-#                         "connections": [],
-#                         "location": "detected_in_text",
-#                         "role": "unknown"
-#                     })
-#                     found_devices.add(device_name)
-#                     device_id_counter += 1
-
-#         if not devices:
-#             logger.warning("No devices detected in text. Creating generic structure.")
-#             devices = [
-#                 {
-#                     "id": "generic_device_1",
-#                     "type": "switch",
-#                     "vendor": "generic",
-#                     "model": "Unknown Switch",
-#                     "specifications": {"ports": "unknown"},
-#                     "connections": [],
-#                     "location": "topology_center",
-#                     "role": "core"
-#                 }
-#             ]
-
-#         return {
-#             "devices": devices,
-#             "topology_structure": "Hierarchical network topology",
-#             "network_segments": ["management", "production"],
-#             "connection_types": ["ethernet", "trunk"],
-#             "deployment_context": "enterprise"
-#         }
-
-#     async def analyze_and_replace_topology(self, image_data: bytes, replacement_query: str, agent) -> Dict[str, Any]:
-#         """Main method with enhanced error handling and logging"""
-#         try:
-#             logger.info(f"Starting topology analysis - Image size: {len(image_data)} bytes")
-
-#             topology_analysis = await self.gemini_service.analyze_topology_image(
-#                 image_data,
-#                 "Focus on identifying all network devices, their types, models, and interconnections"
-#             )
-
-#             current_topology = self.parse_gemini_response(topology_analysis)
-#             devices_count = len(current_topology.get("devices", []))
-#             logger.info(f"Successfully parsed topology with {devices_count} devices")
-
-#             replacement_recommendations = await self.gemini_service.generate_replacement_recommendations(
-#                 current_topology, replacement_query, ""
-#             )
-
-#             recommendations = self.parse_gemini_response(replacement_recommendations)
-
-#             # Generate the RAG-powered justification based on replacement query + recommendations context
-#             rag_justification = agent.generate_response(replacement_query)
-#             html_rag_justification = markdown2.markdown(rag_justification, extras=['tables', 'fenced_code'])
-
-#             modified_topology = self._apply_recommendations(current_topology, recommendations)
-
-#             original_diagram = self.mermaid_generator.generate_network_diagram(
-#                 current_topology, "Original Network Topology"
-#             )
-
-#             modified_diagram = self.mermaid_generator.generate_network_diagram(
-#                 modified_topology, "Modified Network Topology"
-#             )
-
-#             comparison_diagram = self.mermaid_generator.generate_comparison_diagram(
-#                 current_topology, modified_topology
-#             )
-
-#             return {
-#                 "success": True,
-#                 "original_topology": current_topology,
-#                 "modified_topology": modified_topology,
-#                 "recommendations": recommendations,
-#                 "diagrams": {
-#                     "original": original_diagram,
-#                     "modified": modified_diagram,
-#                     "comparison": comparison_diagram
-#                 },
-#                 "analysis_summary": "Analysis completed successfully",
-#                 "topology_explanation": "Network topology analyzed and recommendations generated",
-#                 # "context_sources": "Vector database and web search",
-#                 "context_sources": html_rag_justification,
-#                 "modification_details": {"total_replacements": len(recommendations.get("replacements", []))},
-#                 "implementation_guidance": {"phases": []},
-#                 # "rag_justfication": rag_justification
-#             }
-
-#         except Exception as e:
-#             logger.error(f"Error in topology analysis: {str(e)}")
-#             return {
-#                 "success": False,
-#                 "error": str(e),
-#                 "diagrams": {"original": "", "modified": "", "comparison": ""},
-#                 "analysis_summary": f"Analysis failed: {str(e)}"
-#             }
-
-#     def _apply_recommendations(self, original_topology: Dict[str, Any], recommendations: Dict[str, Any]) -> Dict[str, Any]:
-#         """Apply recommendations to create modified topology"""
-#         # TODO: Implement replacement application logic
-#         return original_topology  # Placeholder for now
-
-# Added from topology module.
-
 import json
 import logging
 import re
@@ -209,10 +5,10 @@ import zlib
 import base64
 import markdown2
 from typing import Dict, Any, Optional, List
-from gemini_service import GeminiService
-from mermaid_generator import MermaidGenerator
-from vector_store import VectorStore
-from web_search import WebSearcher
+from server_tools.gemini_service import GeminiService
+from server_tools.mermaid_generator import MermaidGenerator
+from server_tools.vector_store import VectorStore
+from server_tools.web_search import WebSearcher
 
 logger = logging.getLogger(__name__)
 
@@ -278,8 +74,35 @@ class TopologyAnalyzer:
         except json.JSONDecodeError:
             pass
 
-        # Strategy 5: Create a fallback structure if all else fails
-        logger.warning("All JSON parsing strategies failed. Creating fallback structure.")
+        # Strategy 5: Parse 'Replacement for...' text format
+        logger.info("JSON parsing failed, trying to parse 'Replacement for...' format.")
+        replacements = []
+        # This regex is designed to be flexible with device names
+        pattern = re.compile(r'replacement for\s+([\w\d\s.-]+?):\s*(.*)', re.IGNORECASE)
+        for line in response_text.splitlines():
+            match = pattern.search(line.strip())
+            if match:
+                original_device_name = match.group(1).strip()
+                recommended_model_name = match.group(2).strip()
+                
+                # The comprehensive apply function will handle the name variations
+                replacements.append({
+                    "original_device": {"id": original_device_name},
+                    "recommended_device": {"model": recommended_model_name}
+                })
+        
+        if replacements:
+            logger.info(f"Successfully parsed {len(replacements)} replacements from text format.")
+            # Return a structure that the rest of the system expects
+            return {
+                "replacements": replacements,
+                "justification": "Parsed from text-based recommendations.",
+                "cost_analysis": "Cost analysis needs to be regenerated based on parsed text.",
+                "feature_comparison": "Feature comparison needs to be regenerated based on parsed text."
+            }
+
+        # Strategy 6: Create a fallback structure if all else fails
+        logger.warning("All parsing strategies failed. Creating fallback structure.")
         return self.create_fallback_structure(response_text)
 
     def create_fallback_structure(self, text: str) -> Dict[str, Any]:
@@ -293,7 +116,9 @@ class TopologyAnalyzer:
             (r'ex(\d+)', 'juniper', 'switch'),
             (r'mx(\d+)', 'juniper', 'router'),
             (r'srx(\d+)', 'juniper', 'firewall'),
-            (r'cx\s*(\d+)', 'aruba', 'switch'),
+            (r'(cx\s*\d+)', 'aruba', 'switch'),  # Captures full model like 'CX 6400'
+            (r'aruba\s+(central)', 'aruba', 'management'), # Detects Aruba Central
+            (r'aruba\s+(\d{4})\s*(?:series)?\s*router', 'aruba', 'router'), # Flexible router detection
             (r'procurve\s*(\d+)', 'hpe', 'switch'),
             (r'dcs[-\s]*(\d+)', 'arista', 'switch'),
             (r'(\d+[A-Z]+\d*)', 'generic', 'switch')
@@ -359,19 +184,27 @@ class TopologyAnalyzer:
 
             # Generate the RAG-powered justification which includes recommendations
             rag_justification_and_recs = agent.generate_response(replacement_query, current_topology)
-            logger.info(f"Raw agent response for recommendations: {rag_justification_and_recs}")
 
-            # Parse the response to get recommendations
+            # --- CRITICAL DEBUG LOG ---
+            logger.info(f"--- FULL RAW RAG RESPONSE ---\n{rag_justification_and_recs}\n--- END RAW RAG RESPONSE ---")
+            # --- END CRITICAL DEBUG LOG ---
+
+            initial_topology = current_topology
+            modified_topology = initial_topology # Default to original
+
+            # Determine which recommendations to use
             recommendations = self.parse_gemini_response(rag_justification_and_recs)
-            logger.info(f"Parsed recommendations: {recommendations}")
+            final_recommendations = recommendations
+            if not final_recommendations or not final_recommendations.get("replacements"):
+                logger.warning("No structured replacements found. Attempting dynamic fallback.")
+                final_recommendations = self._create_dynamic_fallback_recommendations(initial_topology, rag_justification_and_recs)
 
-            # If parsing fails or no recommendations are found, generate dynamic fallback recommendations
-            if not recommendations.get("replacements"):
-                logger.warning("No structured recommendations found in agent response. Generating dynamic fallback recommendations.")
-                recommendations = self._create_dynamic_fallback_recommendations(current_topology, replacement_query)
-
-            # Apply the recommendations
-            modified_topology = self._apply_recommendations(current_topology, recommendations)
+            # Apply the chosen recommendations if they exist
+            if final_recommendations and final_recommendations.get("replacements"):
+                logger.info(f"Applying {len(final_recommendations.get('replacements', []))} replacements using comprehensive logic.")
+                modified_topology = self._apply_comprehensive_recommendations(initial_topology, final_recommendations)
+            else:
+                logger.warning("No replacements to apply, either from structured response or fallback.")
 
             original_diagram = self.mermaid_generator.generate_network_diagram(
                 current_topology, "Original Network Topology"
@@ -379,12 +212,6 @@ class TopologyAnalyzer:
 
             modified_mermaid = self.mermaid_generator.generate_network_diagram(modified_topology, "Proposed Topology")
             comparison_mermaid = self.mermaid_generator.generate_comparison_diagram(current_topology, modified_topology)
-            # comparison_mermaid = self.mermaid_generator.generate_comparison_diagram(
-            #     current_topology,
-            #     modified_topology,
-            #     id_generator=lambda device, index: self._generate_mermaid_node_id_from_device(device, index)
-            # )
-
 
             # Generate Kroki URLs for download
             proposed_png_url = self._generate_kroki_url(modified_mermaid, "png")
@@ -424,144 +251,224 @@ class TopologyAnalyzer:
                 "analysis_summary": f"Analysis failed: {str(e)}"
             }
 
+    def _generate_identifier_variants(self, device: Dict[str, Any]) -> List[str]:
+        """
+        Generate all reasonable identifier variants for flexible matching:
+        - Original ID/model/label
+        - Lowercase
+        - Remove underscores
+        - Remove spaces
+        - Concatenated forms
+        """
+        id_ = device.get("id", "") or ""
+        model = device.get("model", "") or ""
+        label = device.get("label", id_) or ""
+        variants = set()
+
+        for val in [id_, model, label]:
+            if not val:
+                continue
+            v = str(val)
+            variants.add(v)
+            variants.add(v.lower())
+            variants.add(v.replace("_", ""))
+            variants.add(v.replace("_", " ").lower())
+            variants.add(v.replace("_", ""))
+            variants.add(v.replace(" ", ""))
+            variants.add(v.replace(" ", "").lower())
+            variants.add(v.replace("_", "").lower())
+        # Remove empty strings
+        return [v for v in variants if v]
+
+    def _parse_replacement_model_from_text(self, device: Dict[str, Any], text: str) -> Optional[str]:
+        """
+        Parses the recommended device model from a structured RAG response.
+        Tries multiple device identifier variants to find the
+        structured replacement line: `Replacement for <identifier>: <model_name>`.
+        """
+        identifier_variants = self._generate_identifier_variants(device)
+        logger.info(f"[PARSER-FLEX] Trying to find replacement for device '{device.get('id')}' using variants: {identifier_variants}")
+
+        clean_text = re.sub(r'[*_`]', '', text)
+
+        # Create a normalized set of variants for robust matching
+        # Normalization: lowercase, remove spaces and underscores
+        normalized_variants = {re.sub(r'[\s_]', '', v.lower()) for v in identifier_variants if v}
+
+        # General pattern to find any 'Replacement for' line
+        general_pattern = re.compile(r"Replacement for\s+([\w\d\s._-]+?)\s*:\s*(.+)", re.IGNORECASE)
+
+        try:
+            for line in clean_text.splitlines():
+                match = general_pattern.search(line)
+                if match:
+                    found_identifier = match.group(1).strip()
+                    model_name = match.group(2).strip()
+
+                    # Normalize the identifier found in the text for comparison
+                    normalized_found = re.sub(r'[\s_]', '', found_identifier.lower())
+
+                    if normalized_found in normalized_variants:
+                        logger.info(f"[PARSER-FLEX] SUCCESS: Matched '{found_identifier}' to device '{device.get('id')}'. Found model: '{model_name}'")
+                        return model_name
+            
+            logger.warning(f"[PARSER-FLEX] FAILED: Could not find a structured replacement for device '{device.get('id')}'.")
+            return None
+        except Exception as e:
+            logger.error(f"[PARSER-FLEX] An unexpected error occurred during parsing for '{device.get('id')}': {e}", exc_info=True)
+            return None
+
     def _create_dynamic_fallback_recommendations(self, topology: Dict[str, Any], query: str) -> Dict[str, Any]:
-        """Create completely dynamic fallback recommendations - FIXED None handling"""
+        """Create completely dynamic fallback recommendations based on query analysis."""
         devices = topology.get("devices", [])
         replacements = []
-        
         query_lower = (query or "").lower()
 
-        # Get all vendors present in the current topology
-        detected_vendors = {(d.get("vendor") or "").lower() for d in devices if d.get("vendor")}
+        detected_vendors = {d.get("vendor", "").lower() for d in devices if d.get("vendor")}
         detected_vendors.discard("generic")
         logger.info(f"Detected vendors in topology: {detected_vendors}")
 
-        source_vendors = []
-        target_vendors = []
-
-        # --- New, more robust vendor extraction logic ---
-        KNOWN_VENDORS = {"cisco", "juniper", "aruba", "hpe", "dell", "fortinet", "palo alto", "vmware", "meraki"}
-
-        # Strategy 1: Look for explicit 'replace X with Y' patterns
-        replace_patterns = [
-            r'replace\s+([\w\s-]+?)\s+with\s+([\w\s-]+)',
-            r'from\s+([\w\s-]+?)\s+to\s+([\w\s-]+)',
-            r'migrate\s+([\w\s-]+?)\s+to\s+([\w\s-]+)',
-        ]
-
-        for pattern in replace_patterns:
-            matches = re.findall(pattern, query_lower)
-            for match in matches:
-                potential_source = match[0].strip()
-                potential_target = match[1].strip()
-                logger.info(f"Fallback regex matched pattern '{pattern}': source='{potential_source}', target='{potential_target}'")
-
-                # Check if the matched source is in the topology
-                if any(v in potential_source for v in detected_vendors):
-                    source_vendors.append(potential_source)
-                    target_vendors.append(potential_target)
-
-        # Strategy 2: If no explicit pattern, look for target vendor keywords
-        if not target_vendors:
-            logger.info("No explicit 'replace' pattern found. Searching for target vendor keywords.")
-            query_words = query_lower.split()
-            for i, word in enumerate(query_words):
-                if word in ["with", "to", "into"] and i + 1 < len(query_words):
-                    potential_target = query_words[i + 1].rstrip('.,')
-                    if potential_target in KNOWN_VENDORS:
-                        logger.info(f"Found explicit target vendor '{potential_target}' after keyword '{word}'.")
-                        target_vendors = [potential_target]
-                        source_vendors = [v for v in detected_vendors if v != potential_target]
-                        logger.info(f"Inferred source vendors: {source_vendors}")
-                        break
-
-        # Strategy 3: Fallback to old logic if still nothing found
-        if not source_vendors or not target_vendors:
-            logger.warning("Could not determine vendors from explicit patterns. Falling back to inference.")
-            vendor_mentions = [v for v in detected_vendors if v in query_lower]
-            if vendor_mentions:
-                source_vendors = vendor_mentions
-                target_vendors = self._infer_target_vendors(source_vendors, query_lower)
-
-        def clean_vendor_list(vendors_phrases, known_set):
-            """Extracts known vendor names from phrases."""
-            cleaned = set()
-            for phrase in vendors_phrases:
-                for known in known_set:
-                    if re.search(r'\b' + re.escape(known) + r'\b', phrase):
-                        cleaned.add(known)
-            return list(cleaned)
-
-        # Clean up vendor names to find the actual vendor in the matched phrases
-        source_vendors = clean_vendor_list(source_vendors, detected_vendors)
-        target_vendors = clean_vendor_list(target_vendors, KNOWN_VENDORS)
-        
+        source_vendors, target_vendors = self._determine_vendor_replacement_scope(query_lower, detected_vendors)
         logger.info(f"Dynamic vendor detection - Source: {source_vendors}, Target: {target_vendors}")
-        
-        # Generate replacements dynamically
+
         for device in devices:
             device_vendor = (device.get("vendor") or "").lower()
-            device_type = device.get("type") or ""
-            device_id = device.get("id") or ""
+            device_id = device.get("id", "")
             device_model = (device.get("model") or "").lower()
-            
-            # Check if this device should be replaced
-            should_replace = False
-            target_vendor = None
-            
-            # Dynamic matching against source vendors
-            for source_vendor in source_vendors:
-                if (device_vendor == source_vendor or 
-                    source_vendor in device_vendor or 
-                    source_vendor in device_model or
-                    source_vendor in device_id.lower()):
-                    should_replace = True
-                    target_vendor = target_vendors[0] if target_vendors else self._infer_single_target_vendor(device_vendor, query_lower)
-                    break
-            
+
+            should_replace, target_vendor = self._check_device_replacement_necessity(
+                device, source_vendors, target_vendors, query_lower
+            )
+
             if should_replace and target_vendor:
-                # Generate dynamic replacement
-                replacement_model = self._generate_dynamic_replacement_model(device, target_vendor, device_type)
-                features = self._generate_dynamic_features(device, target_vendor, device_type)
-                justification = self._generate_dynamic_justification(device, target_vendor, query_lower)
-                
-                replacements.append({
-                    "original_device": {
-                        "id": device_id,
-                        "vendor": device.get("vendor") or "",
-                        "model": device.get("model") or "",
-                        "type": device_type
-                    },
-                    "recommended_device": {
-                        "vendor": target_vendor,
-                        "model": replacement_model,
-                        "features": features,
-                        "specifications": device.get("specifications", {}),
-                        "justification": justification,
-                        "cost_benefit": self._generate_dynamic_cost_benefit(device_vendor, target_vendor),
-                        "migration_complexity": self._assess_migration_complexity(device_vendor, target_vendor)
-                    }
-                })
-        
+                replacement_model = self._parse_replacement_model_from_text(device, query)
+                if not replacement_model:
+                    logger.warning(f"Could not parse specific model for '{device_id}'. Creating descriptive fallback.")
+                    replacement_model = f"ARUBA Replacement for {device.get('model', 'device')}"
+
+                replacements.append(self._build_replacement_object(device, target_vendor, replacement_model, query_lower))
+
         return {
             "replacements": replacements,
             "topology_modifications": {
-                "structural_changes": f"Dynamic device replacements based on query analysis",
-                "performance_impact": "Expected improvements based on vendor capabilities",
-                "security_enhancements": "Enhanced security features with new vendor ecosystem"
+                "structural_changes": "Dynamic device replacements based on query analysis.",
+                "performance_impact": "Expected improvements based on vendor capabilities.",
+                "security_enhancements": "Enhanced security features with new vendor ecosystem."
             },
             "implementation_plan": {
                 "phases": [{
                     "phase_number": 1,
-                    "description": "Dynamic device replacement implementation",
+                    "description": "Dynamic device replacement implementation.",
                     "duration": "2-4 weeks",
                     "risk_level": "medium"
                 }]
             }
         }
 
+    def _determine_vendor_replacement_scope(self, query_lower: str, detected_vendors: set) -> (List[str], List[str]):
+        """Determine the source and target vendors for replacement from the query."""
+        source_vendors, target_vendors = [], []
+        KNOWN_VENDORS = {"cisco", "juniper", "aruba", "hpe", "dell", "fortinet", "palo alto", "vmware", "meraki", "arista"}
+
+        # Handle common typos
+        query_lower = query_lower.replace("ciso", "cisco")
+
+        replace_patterns = [
+            r'replace\s+([,\w\s-]+?)\s+with\s+([,\w\s-]+)',
+            r'from\s+([,\w\s-]+?)\s+to\s+([,\w\s-]+)',
+            r'migrate\s+([,\w\s-]+?)\s+to\s+([,\w\s-]+)',
+        ]
+
+        explicit_replace_found = False
+        for pattern in replace_patterns:
+            matches = re.findall(pattern, query_lower)
+            if matches:
+                explicit_replace_found = True
+                for match in matches:
+                    source, target = match[0].strip(), match[1].strip()
+                    source_vendors.append(source)
+                    target_vendors.append(target)
+
+        if not explicit_replace_found:
+            # Fallback for implicit queries. Only act if source and target are clear.
+            mentioned_vendors = {v for v in KNOWN_VENDORS if re.search(r'\b' + v + r'\b', query_lower, re.IGNORECASE)}
+            potential_target = None
+            query_words = query_lower.split()
+            for i, word in enumerate(query_words):
+                if word in ["with", "to", "into"] and i + 1 < len(query_words):
+                    next_word = query_words[i + 1].rstrip('.,')
+                    if next_word in mentioned_vendors:
+                        potential_target = next_word
+                        break
+
+            if potential_target:
+                # We have a target. The sources are the *other* mentioned vendors.
+                potential_sources = mentioned_vendors - {potential_target}
+                if potential_sources:
+                    target_vendors = [potential_target]
+                    source_vendors = list(potential_sources)
+            else:
+                # No explicit target. Infer one if sources are mentioned.
+                if mentioned_vendors:
+                    source_vendors = list(mentioned_vendors)
+                    target_vendors = self._infer_target_vendors(source_vendors, query_lower)
+
+        def clean_vendor_list(phrases, known_set):
+            """Cleans a list of phrases to extract known vendor names."""
+            cleaned = set()
+            for phrase in phrases:
+                # Also split by common conjunctions
+                sub_phrases = re.split(r'\s+and\s+|,', phrase)
+                for sub_phrase in sub_phrases:
+                    sub_phrase = sub_phrase.strip()
+                    if not sub_phrase:
+                        continue
+                    for known in known_set:
+                        if re.search(r'\b' + re.escape(known) + r'\b', sub_phrase, re.IGNORECASE):
+                            cleaned.add(known)
+            return list(cleaned)
+
+        return clean_vendor_list(source_vendors, KNOWN_VENDORS), clean_vendor_list(target_vendors, KNOWN_VENDORS)
+
+    def _check_device_replacement_necessity(self, device: Dict[str, Any], source_vendors: List[str], target_vendors: List[str], query_lower: str) -> (bool, Optional[str]):
+        """Check if a device should be replaced based on vendor matching."""
+        device_vendor = (device.get("vendor") or "").lower()
+        device_id = (device.get("id") or "").lower()
+        device_model = (device.get("model") or "").lower()
+
+        for source_vendor in source_vendors:
+            if source_vendor is None:
+                continue
+            if (source_vendor in device_vendor) or \
+               (source_vendor in device_model) or \
+               (source_vendor in device_id):
+                target_vendor = target_vendors[0] if target_vendors else self._infer_single_target_vendor(device_vendor, query_lower)
+                return True, target_vendor
+        return False, None
+
+    def _build_replacement_object(self, device: Dict[str, Any], target_vendor: str, replacement_model: str, query_lower: str) -> Dict[str, Any]:
+        """Construct the dictionary for a single device replacement."""
+        return {
+            "original_device": {
+                "id": device.get("id"),
+                "vendor": device.get("vendor"),
+                "model": device.get("model")
+            },
+            "recommended_device": {
+                "vendor": target_vendor.capitalize(),
+                "model": replacement_model,
+                "features": self._generate_dynamic_features(device, target_vendor, device.get("type", "")),
+                "specifications": device.get("specifications", {}),
+                "justification": self._generate_dynamic_justification(device, target_vendor, query_lower),
+                "cost_benefit": self._generate_dynamic_cost_benefit((device.get("vendor") or "").lower(), target_vendor),
+                "migration_complexity": self._assess_migration_complexity((device.get("vendor") or "").lower(), target_vendor)
+            }
+        }
+
     def _infer_target_vendors(self, source_vendors: List[str], query: str) -> List[str]:
         """Dynamically infer target vendors from query context"""
+        safe_query = (query or "").lower()  # Ensure query is a safe, lowercase string
+
         # Common vendor alternatives (dynamically built)
         vendor_alternatives = {
             'cisco': ['aruba', 'juniper', 'arista', 'fortinet'],
@@ -579,7 +486,7 @@ class TopologyAnalyzer:
         
         mentioned_vendors = []
         for vendor in all_vendors:
-            if vendor in query and vendor not in source_vendors:
+            if vendor in safe_query and vendor not in source_vendors:
                 mentioned_vendors.append(vendor)
         
         if mentioned_vendors:
@@ -684,58 +591,42 @@ class TopologyAnalyzer:
         if not replacements:
             logger.info("No replacements to apply.")
             return modified_topology
-
-        device_map = {device['id']: device for device in modified_topology.get("devices", [])}
+        
+        # Create a map of device IDs to their index in the devices list
+        device_id_to_index = {device['id']: i for i, device in enumerate(modified_topology.get("devices", []))}
 
         for replacement in replacements:
             original_device_info = replacement.get("original_device", {})
             original_id = original_device_info.get("id")
-    
-            if original_id in device_map:
-                recommended_device = replacement.get("recommended_device", {})
-                device_to_update = device_map[original_id]
+            
+            if original_id in device_id_to_index:
+                recommended_device_info = replacement.get("recommended_device", {})
+                
+                # Get the index of the device to be replaced
+                device_index = device_id_to_index[original_id]
+                device_to_update = modified_topology["devices"][device_index]
 
-                # Store original ID for connection remapping
-                old_id = device_to_update["id"]
+                # Store original details before updating
+                original_vendor = device_to_update.get('vendor')
+                original_model = device_to_update.get('model')
 
-                # Update vendor, model, specs, etc.
-                device_to_update['vendor'] = recommended_device.get('vendor', device_to_update.get('vendor'))
-                device_to_update['model'] = recommended_device.get('model', device_to_update.get('model'))
-                device_to_update['specifications'] = recommended_device.get('specifications', device_to_update.get('specifications'))
-                device_to_update['role'] = recommended_device.get('role', 'upgraded')
-                device_to_update['notes'] = f"Replaced based on recommendation. Original: {original_device_info.get('vendor')} {original_device_info.get('model')}"
+                # Update the device with new information
+                device_to_update['vendor'] = recommended_device_info.get('vendor', original_vendor)
+                device_to_update['model'] = recommended_device_info.get('model', original_model)
+                device_to_update['specifications'] = recommended_device_info.get('specifications', device_to_update.get('specifications', {}))
+                device_to_update['role'] = recommended_device_info.get('role', device_to_update.get('role', 'upgraded'))
+                
+                # Add metadata about the replacement for clarity
+                device_to_update['is_replaced'] = True
+                device_to_update['original_vendor'] = original_vendor
+                device_to_update['original_model'] = original_model
+                device_to_update['replacement_reason'] = recommended_device_info.get('justification', 'General recommendation.')
 
-                # Generate new ID using your internal helper
-                new_id = self._generate_completely_dynamic_id(
-                    device_to_update.get('vendor'),
-                    device_to_update.get('model'),
-                    device_to_update.get('type', 'device')
-                )
-
-                # Update ID in the device itself
-                device_to_update['id'] = new_id
-
-                # Update references in all other devices' connections
-                for other_device in modified_topology.get("devices", []):
-                    if old_id in other_device.get("connections", []):
-                        other_device["connections"] = [
-                            new_id if conn == old_id else conn
-                            for conn in other_device["connections"]
-                        ]
-
-                # Update key in device_map as well for consistency
-                device_map[new_id] = device_map.pop(old_id)
-
-                logger.info(f"Replaced device '{old_id}' with '{new_id}'")
+                logger.info(f"Applied replacement for device {original_id}")
+            else:
+                logger.warning(f"Device with ID '{original_id}' not found in topology for replacement.")
 
         return modified_topology
-        
-        if motivations:
-            justification += f" to achieve {', '.join(motivations)}"
-        else:
-            justification += f" for improved capabilities and vendor standardization"
-        
-        return justification
 
     def _generate_dynamic_cost_benefit(self, source_vendor: str, target_vendor: str) -> str:
         """Generate cost-benefit analysis based on vendor transition - FIXED None handling"""
@@ -754,93 +645,73 @@ class TopologyAnalyzer:
         else:
             return 'medium'
 
-    def _apply_comprehensive_recommendations(self, original_topology: Dict[str, Any], 
-                                           recommendations: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply recommendations with COMPLETELY DYNAMIC matching - FIXED None handling"""
-        modified_topology = json.loads(json.dumps(original_topology))  # Deep copy
-        
+    def _apply_comprehensive_recommendations(self, original_topology: Dict[str, Any],
+                                       recommendations: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply recommendations with COMPLETELY DYNAMIC matching.
+        This version ensures all original devices are carried over to the modified topology.
+        """
+        # Start with a deep copy to preserve all other topology data
+        modified_topology = json.loads(json.dumps(original_topology))
+
         replacements = recommendations.get("replacements", [])
-        logger.info(f"Applying {len(replacements)} device replacements with DYNAMIC matching")
-        
         if not replacements:
             logger.warning("No replacements found in recommendations")
             return modified_topology
-        
-        devices_replaced = 0
-        
-        for replacement in replacements:
-            original_device_info = replacement.get("original_device", {})
-            recommended_device = replacement.get("recommended_device", {})
-            
-            if not original_device_info or not recommended_device:
-                logger.warning("Skipping replacement due to missing device information")
-                continue
-            
-            # Extract ALL possible matching criteria dynamically - FIXED None handling
-            target_criteria = {
-                'vendor': (original_device_info.get("vendor") or "").lower().strip(),
-                'model': (original_device_info.get("model") or "").lower().strip(),
-                'type': (original_device_info.get("type") or "").lower().strip(),
-                'id': (original_device_info.get("id") or "").lower().strip()
-            }
-            
-            # Extract new device information - FIXED None handling
-            new_vendor = (recommended_device.get("vendor") or "").lower().strip()
-            new_model = (recommended_device.get("model") or "").strip()
-            new_features = recommended_device.get("features", [])
-            justification = recommended_device.get("justification") or ""
-            
-            logger.info(f"Dynamic search for device matching criteria: {target_criteria}")
-            logger.info(f"Replacement target: {new_vendor} {new_model}")
-            
-            # COMPLETELY DYNAMIC MATCHING: Score-based approach
-            best_match = None
-            best_score = 0
-            
-            for device in modified_topology.get("devices", []):
-                if device.get("is_replaced"):  # Skip already replaced devices
-                    continue
-                
-                # Calculate dynamic match score
-                match_score = self._calculate_dynamic_match_score(device, target_criteria)
-                
-                if match_score > best_score:
-                    best_score = match_score
-                    best_match = device
-                    logger.info(f"New best match: {device.get('id')} with score {match_score:.2f}")
-            
-            # Apply replacement if we found a good match (dynamic threshold)
-            min_threshold = 0.3  # Configurable threshold
-            if best_match and best_score >= min_threshold:
-                # Store original information - FIXED None handling
-                old_vendor = best_match.get("vendor") or "Unknown"
-                old_model = best_match.get("model") or "Unknown"
-                old_id = best_match.get("id") or "Unknown"
-                
-                # APPLY THE REPLACEMENT DYNAMICALLY
-                best_match["vendor"] = new_vendor
-                best_match["model"] = new_model
-                best_match["features"] = new_features
-                best_match["replacement_reason"] = justification
-                best_match["original_vendor"] = old_vendor
-                best_match["original_model"] = old_model
-                best_match["original_id"] = old_id
-                best_match["is_replaced"] = True
-                
-                # Generate completely dynamic new ID
-                best_match["id"] = self._generate_completely_dynamic_id(new_vendor, new_model, best_match.get("type") or "device")
-                
-                devices_replaced += 1
-                logger.info(f"🎯 DYNAMIC REPLACEMENT SUCCESS: {old_vendor} {old_model} → {new_vendor} {new_model} (score: {best_score:.2f})")
-            else:
-                logger.warning(f"❌ NO SUITABLE MATCH FOUND: best score {best_score:.2f} below threshold {min_threshold}")
-        
-        logger.info(f"🔄 TOTAL DEVICES REPLACED: {devices_replaced}")
-        
-        # Update topology metadata
-        modified_topology["devices_replaced_count"] = devices_replaced
-        modified_topology["topology_modifications"] = f"Dynamically replaced {devices_replaced} devices based on AI recommendations"
-        
+
+        # Create a list of devices that have already been matched to a replacement
+        matched_device_ids = set()
+
+        # Process each device from the original topology
+        new_devices = []
+        for device in original_topology.get("devices", []):
+            device_copy = device.copy()  # Work with a copy
+
+            # Find the best replacement recommendation for the current device
+            best_match_score = 0.3  # Minimum threshold for a match
+            best_replacement = None
+
+            for replacement in replacements:
+                original_device_info = replacement.get("original_device", {})
+
+                target_criteria = {
+                    'vendor': (original_device_info.get("vendor") or "").lower().strip(),
+                    'model': (original_device_info.get("model") or "").lower().strip(),
+                    'type': (original_device_info.get("type") or "").lower().strip(),
+                    'id': (original_device_info.get("id") or "").lower().strip()
+                }
+
+                match_score = self._calculate_dynamic_match_score(device_copy, target_criteria)
+
+                if match_score > best_match_score:
+                    best_match_score = match_score
+                    best_replacement = replacement
+
+            # If a suitable replacement is found, apply it
+            if best_replacement:
+                recommended_device = best_replacement.get("recommended_device", {})
+                new_vendor = (recommended_device.get("vendor") or "").lower().strip()
+                new_model = (recommended_device.get("model") or "").strip()
+
+                # Store original details
+                device_copy['original_vendor'] = device_copy.get("vendor", "Unknown")
+                device_copy['original_model'] = device_copy.get("model", "Unknown")
+                device_copy['is_replaced'] = True
+                device_copy['replacement_reason'] = recommended_device.get("justification", "Recommended upgrade")
+
+                # Apply new details
+                device_copy['vendor'] = new_vendor
+                device_copy['model'] = new_model
+                device_copy['features'] = recommended_device.get("features", [])
+
+                logger.info(f"Device {device_copy.get('id')} marked for replacement with {new_vendor} {new_model}")
+
+            new_devices.append(device_copy)
+
+        modified_topology['devices'] = new_devices
+        modified_topology["devices_replaced_count"] = sum(1 for d in new_devices if d.get("is_replaced"))
+
+        logger.info(f"Comprehensive recommendation application complete. Total devices in new topology: {len(new_devices)}")
         return modified_topology
 
     def _calculate_dynamic_match_score(self, device: Dict[str, Any], target_criteria: Dict[str, str]) -> float:
@@ -1009,7 +880,7 @@ class TopologyAnalyzer:
         # Device breakdown
         device_types = {}
         for device in original_devices:
-            device_type = device.get('type', 'Unknown')
+            device_type = (device.get('type') or 'Unknown').lower()
             device_types[device_type] = device_types.get(device_type, 0) + 1
         
         summary_parts.append("Device Breakdown:")
@@ -1094,16 +965,3 @@ class TopologyAnalyzer:
             "rollback_procedures": [],
             "success_criteria": []
         }
-
-# Added to fix comparision topology.
-    def _generate_mermaid_node_id_from_device(self, device: Dict[str, Any], index: int) -> str:
-        """Generate a Mermaid-safe unique node ID using existing dynamic ID logic"""
-        base_id = self._generate_completely_dynamic_id(
-            vendor=device.get("vendor"),
-            model=device.get("model"),
-            device_type=device.get("type", "device")
-        )
-        # Sanitize & ensure unique
-        base_id = base_id.lower().replace(" ", "_")
-        base_id = re.sub(r'\W+', '', base_id)  # remove special characters
-        return f"{base_id}_{index}"  # make it Mermaid-unique

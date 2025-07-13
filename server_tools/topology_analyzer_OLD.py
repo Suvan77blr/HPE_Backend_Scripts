@@ -5,20 +5,12 @@ import zlib
 import base64
 import markdown2
 from typing import Dict, Any, Optional, List
-from gemini_service import GeminiService
-from mermaid_generator import MermaidGenerator
-from vector_store import VectorStore
-from web_search import WebSearcher
+from server_tools.gemini_service import GeminiService
+from server_tools.mermaid_generator_OLD import MermaidGenerator
+from server_tools.vector_store import VectorStore
+from server_tools.web_search import WebSearcher
 
-import os
-
-# logger = logging.getLogger(__name__)
-logger = logging.getLogger("topology_analyser")
-logger.setLevel(logging.DEBUG)
-
-# Optional: Create a file handler for full raw responses
-LOG_DIR = "logs"
-os.makedirs(LOG_DIR, exist_ok=True)
+logger = logging.getLogger(__name__)
 
 class TopologyAnalyzer:
     def __init__(self, vector_store: VectorStore, web_searcher: Optional[WebSearcher] = None):
@@ -34,177 +26,8 @@ class TopologyAnalyzer:
         encoded = base64.urlsafe_b64encode(compressed).decode('utf-8')
         return f"https://kroki.io/mermaid/{output_format}/{encoded}"
 
-    def parse_gemini_response(self, response_text: str, query_id: Optional[str] = None) -> Dict[str, Any]:
-        """Robust JSON parsing with multiple fallback strategies + extracted explicit device replacements"""
-        import os
-        import uuid
-
-        logger.info(f"Parsing Gemini response of {len(response_text)} characters")
-        logger.debug("Response preview (first 500 chars): %s", response_text[:500])
-
-        # Save full response to disk for debugging
-        if query_id is None:
-            query_id = str(uuid.uuid4())
-
-        log_dir = "logs/llm_responses"
-        os.makedirs(log_dir, exist_ok=True)
-        response_path = os.path.join(log_dir, f"{query_id}.txt")
-        try:
-            with open(response_path, "w", encoding="utf-8") as f:
-                f.write(response_text)
-            logger.info(f"Saved full LLM response to {response_path}")
-        except Exception as e:
-            logger.warning(f"Failed to write LLM response to file: {e}")
-
-        parsed = None
-
-        # Strategy 1: Extract JSON from ```json ... ```
-        match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-        if match:
-            json_str = match.group(1).strip()
-            try:
-                parsed = json.loads(json_str)
-                logger.info("Successfully extracted JSON from ```json block")
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse JSON from ```json block: {e}")
-
-        # Strategy 2: Between first { and last }
-        if not parsed:
-            try:
-                start_index = response_text.find('{')
-                end_index = response_text.rfind('}')
-                if start_index != -1 and end_index != -1 and end_index > start_index:
-                    json_str = response_text[start_index:end_index + 1]
-                    parsed = json.loads(json_str)
-                    logger.info("Successfully parsed JSON between first '{' and last '}'")
-                else:
-                    logger.debug("Braces not found or incorrectly ordered in response.")
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse JSON between braces: {e}")
-
-        # Strategy 3: Generic ``` block
-        if not parsed:
-            match = re.search(r'```(.*?)```', response_text, re.DOTALL)
-            if match:
-                json_str = match.group(1).strip()
-                if json_str.startswith('json'):
-                    json_str = json_str[4:].lstrip()
-                try:
-                    parsed = json.loads(json_str)
-                    logger.info("Successfully extracted JSON from generic ``` block")
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse JSON from generic ``` block: {e}")
-
-        # Strategy 4: Try direct parse
-        if not parsed:
-            try:
-                parsed = json.loads(response_text.strip())
-                logger.info("Successfully parsed JSON directly from entire response")
-            except json.JSONDecodeError as e:
-                logger.debug(f"Direct full-text JSON parse failed: {e}")
-
-        # If still not parsed, use fallback
-        if not parsed:
-            logger.warning("All JSON parsing strategies failed. Falling back to regex/heuristic strategy.")
-            parsed = self.create_fallback_structure(response_text)
-
-        # --- ADDITION: Extract vendor replacements from Gemini output ---
-        replacement_lines = re.findall(
-            r'(?P<source_vendor>\b\w+)\s+(?P<source_model>[\w\d\s\-]+?)\s*→\s*(?P<target_vendor>\b\w+)\s+(?P<target_model>[\w\d\s\-]+?)(?:\s+Series)?',
-            response_text
-        )
-
-        replacement_map = {}
-        for src_vendor, src_model, tgt_vendor, tgt_model in replacement_lines:
-            source_key = f"{src_vendor.strip().lower()} {src_model.strip().lower()}"
-            replacement_map[source_key] = {
-                "vendor": tgt_vendor.strip().lower(),
-                "model": tgt_model.strip()
-            }
-
-        if replacement_map:
-            logger.info(f"Extracted {len(replacement_map)} explicit vendor-model replacements.")
-        else:
-            logger.info("No explicit replacements found in Gemini response.")
-
-        parsed["explicit_replacements"] = replacement_map
-        return parsed
-
-    """def parse_gemini_response(self, response_text: str, query_id: Optional[str] = None) -> Dict[str, Any]:
-        \"""Robust JSON parsing with multiple fallback strategies\"""
-        import os
-        import uuid
-
-        logger.info(f"Parsing Gemini response of {len(response_text)} characters")
-        logger.debug("Response preview (first 500 chars): %s", response_text[:50])
-
-        # Save full response to disk for debugging
-        if query_id is None:
-            query_id = str(uuid.uuid4())
-
-        log_dir = "logs/llm_responses"
-        os.makedirs(log_dir, exist_ok=True)
-        response_path = os.path.join(log_dir, f"{query_id}.txt")
-        try:
-            with open(response_path, "w", encoding="utf-8") as f:
-                f.write(response_text)
-            logger.info(f"Saved full LLM response to {response_path}")
-        except Exception as e:
-            logger.warning(f"Failed to write LLM response to file: {e}")
-
-        # Strategy 1: Extract JSON from ```json ... ```
-        match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-        if match:
-            json_str = match.group(1).strip()
-            try:
-                parsed = json.loads(json_str)
-                logger.info("Successfully extracted JSON from ```json block")
-                return parsed
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse JSON from ```json block: {e}")
-
-        # Strategy 2: Between first { and last }
-        try:
-            start_index = response_text.find('{')
-            end_index = response_text.rfind('}')
-            if start_index != -1 and end_index != -1 and end_index > start_index:
-                json_str = response_text[start_index:end_index + 1]
-                parsed = json.loads(json_str)
-                logger.info("Successfully parsed JSON between first '{' and last '}'")
-                return parsed
-            else:
-                logger.debug("Braces not found or incorrectly ordered in response.")
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse JSON between braces: {e}")
-
-        # Strategy 3: Generic ``` block
-        match = re.search(r'```(.*?)```', response_text, re.DOTALL)
-        if match:
-            json_str = match.group(1).strip()
-            if json_str.startswith('json'):
-                json_str = json_str[4:].lstrip()
-            try:
-                parsed = json.loads(json_str)
-                logger.info("Successfully extracted JSON from generic ``` block")
-                return parsed
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse JSON from generic ``` block: {e}")
-
-        # Strategy 4: Try direct parse
-        try:
-            parsed = json.loads(response_text.strip())
-            logger.info("Successfully parsed JSON directly from entire response")
-            return parsed
-        except json.JSONDecodeError as e:
-            logger.debug(f"Direct full-text JSON parse failed: {e}")
-
-        # Strategy 5: Fallback
-        logger.warning("All JSON parsing strategies failed. Falling back to regex/heuristic strategy.")
-        return self.create_fallback_structure(response_text)
-"""
-
-    """def parse_gemini_response(self, response_text: str) -> Dict[str, Any]:
-        \"""Robust JSON parsing with multiple fallback strategies\"""
+    def parse_gemini_response(self, response_text: str) -> Dict[str, Any]:
+        """Robust JSON parsing with multiple fallback strategies"""
         logger.info(f"Parsing Gemini response of {len(response_text)} characters")
 
         # Strategy 1: Extract JSON from markdown code blocks ```json ... ```
@@ -254,85 +77,9 @@ class TopologyAnalyzer:
         # Strategy 5: Create a fallback structure if all else fails
         logger.warning("All JSON parsing strategies failed. Creating fallback structure.")
         return self.create_fallback_structure(response_text)
-        """
 
     def create_fallback_structure(self, text: str) -> Dict[str, Any]:
-        """Create structured data from unstructured text with ID validation and better model specificity"""
-        import re
-        import uuid
-
-        devices = []
-        found_devices = set()
-        seen_ids = set()
-
-        # Improve model name detection with clearer groups
-        device_patterns = [
-            (r'catalyst\s*(\d+)', 'cisco', 'switch', 'Catalyst'),
-            (r'nexus\s*(\d+)', 'cisco', 'switch', 'Nexus'),
-            (r'c(\d{4})', 'cisco', 'switch', 'C'),
-            (r'ex(\d+)', 'juniper', 'switch', 'EX'),
-            (r'mx(\d+)', 'juniper', 'router', 'MX'),
-            (r'srx(\d+)', 'juniper', 'firewall', 'SRX'),
-            (r'cx\s*(\d+)', 'aruba', 'switch', 'CX'),
-            (r'procurve\s*(\d+)', 'hpe', 'switch', 'ProCurve'),
-            (r'dcs[-\s]*(\d+)', 'arista', 'switch', 'DCS'),
-            (r'(\d+[A-Z]+\d*)', 'generic', 'switch', '')
-        ]
-
-        for pattern, vendor, device_type, prefix in device_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            for match in matches:
-                model = f"{vendor.upper()} {prefix} {match}".strip()
-                device_key = f"{vendor}_{device_type}_{prefix}_{match}".lower()
-
-                if device_key not in found_devices:
-                    # Generate clean UUID-style ID if needed
-                    device_id = f"{vendor}_{device_type}_{match}".lower().replace(" ", "_")
-                    if device_id in seen_ids or len(device_id) < 3:
-                        device_id = f"device_fallback_{uuid.uuid4().hex[:6]}"
-                    seen_ids.add(device_id)
-
-                    devices.append({
-                        "id": device_id,
-                        "type": device_type,
-                        "vendor": vendor,
-                        "model": model,
-                        "specifications": {
-                            "ports": "unknown",
-                            "speed": "unknown"
-                        },
-                        "connections": [],
-                        "location": "detected_in_text",
-                        "role": "unknown"
-                    })
-                    found_devices.add(device_key)
-
-        if not devices:
-            logger.warning("No devices detected in text. Creating generic structure.")
-            devices = [
-                {
-                    "id": "generic_device_1",
-                    "type": "switch",
-                    "vendor": "generic",
-                    "model": "Unknown Switch",
-                    "specifications": {"ports": "unknown"},
-                    "connections": [],
-                    "location": "topology_center",
-                    "role": "core"
-                }
-            ]
-
-        logger.info("Fallback generated %d device(s)", len(devices))
-        return {
-            "devices": devices,
-            "topology_structure": "Hierarchical network topology",
-            "network_segments": ["management", "production"],
-            "connection_types": ["ethernet", "trunk"],
-            "deployment_context": "enterprise"
-        }
-
-    """def create_fallback_structure(self, text: str) -> Dict[str, Any]:
-        \"""Create structured data from unstructured text\"""
+        """Create structured data from unstructured text"""
         devices = []
 
         device_patterns = [
@@ -391,20 +138,6 @@ class TopologyAnalyzer:
             "connection_types": ["ethernet", "trunk"],
             "deployment_context": "enterprise"
         }
-    """
-
-    def sanitize_devices(devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        seen_ids = set()
-        valid_devices = []
-        for idx, device in enumerate(devices):
-            device_id = device.get("id", "").strip()
-            if not device_id or device_id in seen_ids or len(device_id) < 3:
-                device_id = f"device_fallback_{idx}"
-                logger.warning(f"Invalid or duplicate device ID found. Assigning new ID: {device_id}")
-            device["id"] = device_id
-            seen_ids.add(device_id)
-            valid_devices.append(device)
-        return valid_devices
 
     async def analyze_and_replace_topology(self, image_data: bytes, replacement_query: str, agent) -> Dict[str, Any]:
         """Main method with enhanced error handling and logging"""
@@ -482,151 +215,6 @@ class TopologyAnalyzer:
             }
 
     def _create_dynamic_fallback_recommendations(self, topology: Dict[str, Any], query: str) -> Dict[str, Any]:
-        """Create dynamic fallback recommendations with explicit replacement support"""
-        devices = topology.get("devices", [])
-        replacements = []
-
-        query_lower = (query or "").lower()
-
-        # Grab extracted replacement map if available
-        explicit_replacements = topology.get("explicit_replacements", {})
-
-        # Get all vendors present in the current topology
-        detected_vendors = {(d.get("vendor") or "").lower() for d in devices if d.get("vendor")}
-        detected_vendors.discard("generic")
-        logger.info(f"Detected vendors in topology: {detected_vendors}")
-
-        source_vendors = []
-        target_vendors = []
-
-        # Known vendor list
-        KNOWN_VENDORS = {"cisco", "juniper", "aruba", "hpe", "dell", "fortinet", "palo alto", "vmware", "meraki"}
-
-        # Strategy 1: Regex-based extraction
-        replace_patterns = [
-            r'replace\s+([\w\s-]+?)\s+with\s+([\w\s-]+)',
-            r'from\s+([\w\s-]+?)\s+to\s+([\w\s-]+)',
-            r'migrate\s+([\w\s-]+?)\s+to\s+([\w\s-]+)',
-        ]
-        for pattern in replace_patterns:
-            matches = re.findall(pattern, query_lower)
-            for match in matches:
-                potential_source = match[0].strip()
-                potential_target = match[1].strip()
-                logger.info(f"Fallback regex matched pattern '{pattern}': source='{potential_source}', target='{potential_target}'")
-
-                if any(v in potential_source for v in detected_vendors):
-                    source_vendors.append(potential_source)
-                    target_vendors.append(potential_target)
-
-        # Strategy 2: Keyword context
-        if not target_vendors:
-            logger.info("No explicit 'replace' pattern found. Searching for target vendor keywords.")
-            query_words = query_lower.split()
-            for i, word in enumerate(query_words):
-                if word in ["with", "to", "into"] and i + 1 < len(query_words):
-                    potential_target = query_words[i + 1].rstrip('.,')
-                    if potential_target in KNOWN_VENDORS:
-                        logger.info(f"Found explicit target vendor '{potential_target}' after keyword '{word}'.")
-                        target_vendors = [potential_target]
-                        source_vendors = [v for v in detected_vendors if v != potential_target]
-                        logger.info(f"Inferred source vendors: {source_vendors}")
-                        break
-
-        # Strategy 3: Fallback
-        if not source_vendors or not target_vendors:
-            logger.warning("Could not determine vendors from explicit patterns. Falling back to inference.")
-            vendor_mentions = [v for v in detected_vendors if v in query_lower]
-            if vendor_mentions:
-                source_vendors = vendor_mentions
-                target_vendors = self._infer_target_vendors(source_vendors, query_lower)
-
-        def clean_vendor_list(vendors_phrases, known_set):
-            cleaned = set()
-            for phrase in vendors_phrases:
-                for known in known_set:
-                    if re.search(r'\b' + re.escape(known) + r'\b', phrase):
-                        cleaned.add(known)
-            return list(cleaned)
-
-        source_vendors = clean_vendor_list(source_vendors, detected_vendors)
-        target_vendors = clean_vendor_list(target_vendors, KNOWN_VENDORS)
-
-        logger.info(f"Dynamic vendor detection - Source: {source_vendors}, Target: {target_vendors}")
-
-        # Generate recommendations
-        for device in devices:
-            device_vendor = (device.get("vendor") or "").lower()
-            device_type = device.get("type") or ""
-            device_id = device.get("id") or ""
-            device_model = (device.get("model") or "").lower()
-            device_key = f"{device_vendor} {device_model}".strip()
-
-            should_replace = False
-            target_vendor = None
-
-            # Prefer explicit replacement
-            if device_key in explicit_replacements:
-                should_replace = True
-                target_vendor = explicit_replacements[device_key]["vendor"]
-                logger.info(f"Using explicit Gemini replacement for {device_key}")
-            else:
-                for source_vendor in source_vendors:
-                    if (device_vendor == source_vendor or
-                        source_vendor in device_vendor or
-                        source_vendor in device_model or
-                        source_vendor in device_id.lower()):
-                        should_replace = True
-                        target_vendor = target_vendors[0] if target_vendors else self._infer_single_target_vendor(device_vendor, query_lower)
-                        break
-
-            if should_replace and target_vendor:
-                replacement_model = self._generate_dynamic_replacement_model(
-                    device,
-                    target_vendor,
-                    device_type,
-                    explicit_replacements
-                )
-                features = self._generate_dynamic_features(device, target_vendor, device_type)
-                justification = self._generate_dynamic_justification(device, target_vendor, query_lower)
-
-                replacements.append({
-                    "original_device": {
-                        "id": device_id,
-                        "vendor": device.get("vendor") or "",
-                        "model": device.get("model") or "",
-                        "type": device_type
-                    },
-                    "recommended_device": {
-                        "vendor": target_vendor,
-                        "model": replacement_model,
-                        "features": features,
-                        "specifications": device.get("specifications", {}),
-                        "justification": justification,
-                        "cost_benefit": self._generate_dynamic_cost_benefit(device_vendor, target_vendor),
-                        "migration_complexity": self._assess_migration_complexity(device_vendor, target_vendor)
-                    }
-                })
-
-        return {
-            "replacements": replacements,
-            "topology_modifications": {
-                "structural_changes": f"Dynamic device replacements based on query analysis",
-                "performance_impact": "Expected improvements based on vendor capabilities",
-                "security_enhancements": "Enhanced security features with new vendor ecosystem"
-            },
-            "implementation_plan": {
-                "phases": [{
-                    "phase_number": 1,
-                    "description": "Dynamic device replacement implementation",
-                    "duration": "2-4 weeks",
-                    "risk_level": "medium"
-                }]
-            }
-        }
-
-
-    '''def _create_dynamic_fallback_recommendations(self, topology: Dict[str, Any], query: str) -> Dict[str, Any]:
         """Create completely dynamic fallback recommendations - FIXED None handling"""
         devices = topology.get("devices", [])
         replacements = []
@@ -760,7 +348,7 @@ class TopologyAnalyzer:
                     "risk_level": "medium"
                 }]
             }
-        }'''
+        }
 
     def _infer_target_vendors(self, source_vendors: List[str], query: str) -> List[str]:
         """Dynamically infer target vendors from query context"""
@@ -800,43 +388,8 @@ class TopologyAnalyzer:
         targets = self._infer_target_vendors([source_vendor], query)
         return targets[0] if targets else 'cisco'
 
-    def _generate_dynamic_replacement_model(self, device: Dict[str, Any], target_vendor: str, device_type: str, replacements_map: Optional[Dict[str, Dict[str, str]]] = None) -> str:
-        """Generate replacement model based on device characteristics or explicit mapping"""
-        device_model = (device.get("model") or "").lower().strip()
-        device_vendor = (device.get("vendor") or "").lower().strip()
-        device_id = (device.get("id") or "").lower()
-
-        target_vendor = target_vendor or "generic"
-        device_type = device_type or "device"
-
-        # Try exact match in replacements map
-        if replacements_map:
-            key = f"{device_vendor} {device_model}".lower()
-            if key in replacements_map:
-                mapped_model = replacements_map[key]["model"]
-                logger.info(f"Using Gemini-mapped replacement for {key} → {mapped_model}")
-                return mapped_model
-
-        # Generic fallback logic
-        if device_type == "switch":
-            if any(keyword in device_id or keyword in device_model for keyword in ['core', 'catalyst', '9500', '8400']):
-                return f"{target_vendor.title()} Core Switch Series"
-            elif any(keyword in device_id or keyword in device_model for keyword in ['access', '2960', 'edge']):
-                return f"{target_vendor.title()} Access Switch Series"
-            else:
-                return f"{target_vendor.title()} Switch Series"
-
-        elif device_type == "router":
-            return f"{target_vendor.title()} Router Series"
-
-        elif device_type == "firewall":
-            return f"{target_vendor.title()} Security Appliance"
-
-        return f"{target_vendor.title()} {device_type.title()}"
-
-
-    '''def _generate_dynamic_replacement_model(self, device: Dict[str, Any], target_vendor: str, device_type: str) -> str:
-        \"""Generate appropriate replacement model based on device characteristics - FIXED None handling"""
+    def _generate_dynamic_replacement_model(self, device: Dict[str, Any], target_vendor: str, device_type: str) -> str:
+        """Generate appropriate replacement model based on device characteristics - FIXED None handling"""
         device_model = (device.get("model") or "").lower()
         device_id = (device.get("id") or "").lower()
         
@@ -860,7 +413,7 @@ class TopologyAnalyzer:
             return f"{target_vendor.title()} Security Appliance"
         
         # Default
-        return f"{target_vendor.title()} {device_type.title()}"'''
+        return f"{target_vendor.title()} {device_type.title()}"
 
     def _generate_dynamic_features(self, device: Dict[str, Any], target_vendor: str, device_type: str) -> List[str]:
         """Generate appropriate features based on vendor and device type"""

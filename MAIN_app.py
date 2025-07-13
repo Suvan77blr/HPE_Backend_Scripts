@@ -4,21 +4,22 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import logging
 import uvicorn
-from vector_store import VectorStore
-from llm_service import LLMService
-from AA_agent import NetworkIntegrationAgent
-from web_search import WebSearcher
-from topology_analyzer_Latest import TopologyAnalyzer
+from server_tools.vector_store import VectorStore
+from server_tools.llm_service_OLD import LLMService
+from server_tools.AA_agent import NetworkIntegrationAgent
+from server_tools.web_search import WebSearcher
+from server_tools.topology_analyzer import TopologyAnalyzer
 
 from environment import ENABLE_WEB_SEARCH, MAX_SEARCH_RESULTS, GROQ_MODEL, GROQ_API_KEY
 
 # Import Groq orchestrator
-from AA_groq_orchestrator import GroqOrchestrator
+from groq_orchestrator import GroqOrchestrator
 
 # Import routers
-from AA_mcp_api import router as mcp_router
-from topology_api import router as topology_router
-from admin_api import router as admin_router
+from server_routes.AA_mcp_api import router as mcp_router
+from server_routes.topology_api import router as topology_router
+from server_routes.admin_api import router as admin_router
+from server_routes.simple_rag_api import build_rag_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,6 +57,15 @@ app.add_middleware(
 app.include_router( mcp_router(groq_orchestrator), prefix="/mcp" )
 app.include_router(topology_router, prefix="/topology")
 app.include_router(admin_router, prefix="/admin")
+app.include_router(
+    build_rag_router(
+        llm_service=llm_service,
+        vector_store=vector_store,
+        web_searcher=web_searcher,
+        groq_orchestrator=groq_orchestrator
+    ), 
+    prefix="/rag"
+)
 
 class QueryRequest(BaseModel):
     query: str

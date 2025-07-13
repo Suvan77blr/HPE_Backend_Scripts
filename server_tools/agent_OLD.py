@@ -3,9 +3,9 @@ import re
 import json
 from typing import Dict, List, Any, Optional
 
-from vector_store import VectorStore # For collection name constants
-from llm_service import LLMService
-from web_search import WebSearcher # Assuming this is your web search class
+from server_tools.vector_store import VectorStore # For collection name constants
+from server_tools.llm_service_OLD import LLMService
+from server_tools.web_search import WebSearcher # Assuming this is your web search class
 
 logger = logging.getLogger(__name__)
 

@@ -40,7 +40,7 @@ except ImportError as e:
 # Lazy import helpers - imports happen only when components are first used
 def lazy_import_vector_store():
     try:
-        from vector_store import VectorStore
+        from server_tools.vector_store import VectorStore
         print("VectorStore import successful", file=sys.stderr)
         return VectorStore
     except ImportError as e:
@@ -49,7 +49,7 @@ def lazy_import_vector_store():
 
 def lazy_import_agent():
     try:
-        from OLD_agent import NetworkIntegrationAgent
+        from server_tools.agent_OLD import NetworkIntegrationAgent
         print("NetworkIntegrationAgent import successful", file=sys.stderr)
         return NetworkIntegrationAgent
     except ImportError as e:
@@ -58,7 +58,7 @@ def lazy_import_agent():
 
 def lazy_import_web_searcher():
     try:
-        from web_search import WebSearcher
+        from server_tools.web_search import WebSearcher
         print("WebSearcher import successful", file=sys.stderr)
         return WebSearcher
     except ImportError as e:
@@ -67,7 +67,7 @@ def lazy_import_web_searcher():
 
 def lazy_import_scraper():
     try:
-        from scraper import NetworkDocScraper
+        from server_tools.scraper import NetworkDocScraper
         print("NetworkDocScraper import successful", file=sys.stderr)
         return NetworkDocScraper
     except ImportError as e:
@@ -76,7 +76,7 @@ def lazy_import_scraper():
 
 def lazy_import_ingestion():
     try:
-        from ingestion import DataIngestionPipeline
+        from server_tools.ingestion import DataIngestionPipeline
         print("DataIngestionPipeline import successful", file=sys.stderr)
         return DataIngestionPipeline
     except ImportError as e:
@@ -85,7 +85,7 @@ def lazy_import_ingestion():
 
 def lazy_import_document_processor():
     try:
-        from document_processor import DocumentProcessor
+        from server_tools.document_processor import DocumentProcessor
         print("DocumentProcessor import successful", file=sys.stderr)
         return DocumentProcessor
     except ImportError as e:
@@ -94,7 +94,7 @@ def lazy_import_document_processor():
 
 def lazy_import_llm_service():
     try:
-        from llm_service import LLMService
+        from server_tools.llm_service_OLD import LLMService
         print("LLMService import successful", file=sys.stderr)
         return LLMService
     except ImportError as e:

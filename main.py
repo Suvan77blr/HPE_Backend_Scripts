@@ -1,11 +1,11 @@
 import uvicorn
 from WRKING_api import app # Your FastAPI app instance
 # from api_NEW import app # Your FastAPI app instance
-from update_checker import UpdateChecker # Your UpdateChecker class
+from server_tools.update_checker import UpdateChecker # Your UpdateChecker class
 import logging
-from ingestion import DataIngestionPipeline # Your DataIngestionPipeline class
-from vector_store import VectorStore # Your VectorStore class
-from scraper import NetworkDocScraper # Your NetworkDocScraper class
+from server_tools.ingestion import DataIngestionPipeline # Your DataIngestionPipeline class
+from server_tools.vector_store import VectorStore # Your VectorStore class
+from server_tools.scraper import NetworkDocScraper # Your NetworkDocScraper class
 import os
 from environment import GROQ_API_KEY, ENABLE_WEB_SEARCH # Assuming these are in your environment.py
 # --- Configure logging (do this once at the application start) ---

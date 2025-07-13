@@ -1,22 +1,3 @@
-# routes/topology_router.py
-
-# from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
-# from fastapi.staticfiles import StaticFiles
-# from fastapi.templating import Jinja2Templates
-# from fastapi.responses import HTMLResponse
-# from pydantic import BaseModel
-# from typing import Optional, Dict, Any
-# import logging
-# import uvicorn
-# from vector_store import VectorStore
-# from llm_service import LLMService
-# from agent import NetworkIntegrationAgent
-# from update_checker import UpdateChecker
-# from web_search import WebSearcher
-# from topology_analyzer import TopologyAnalyzer
-# from environment import ENABLE_WEB_SEARCH, MAX_SEARCH_RESULTS
-# from environment import GROQ_MODEL, GROQ_API_KEY
-
 from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -26,12 +7,11 @@ import logging
 
 from environment import ENABLE_WEB_SEARCH, MAX_SEARCH_RESULTS, GROQ_MODEL
 
-from topology_analyzer_Latest import TopologyAnalyzer
-# from topology_analyzer import TopologyAnalyzer
-from OLD_agent import NetworkIntegrationAgent
-from vector_store import VectorStore
-from llm_service import LLMService
-from web_search import WebSearcher
+from server_tools.topology_analyzer import TopologyAnalyzer
+from server_tools.agent_OLD import NetworkIntegrationAgent
+from server_tools.vector_store import VectorStore
+from server_tools.llm_service_OLD import LLMService
+from server_tools.web_search import WebSearcher
 
 # Setup
 router = APIRouter()
